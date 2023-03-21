@@ -2,6 +2,8 @@ const path = require("path");
 const { parse } = require("csv-parse");
 const fs = require("fs");
 
+const planets = require("./planets.mongo");
+
 function isHabitablePlanet(planet) {
   return (
     planet["koi_disposition"] === "CONFIRMED" &&
@@ -10,8 +12,6 @@ function isHabitablePlanet(planet) {
     planet["koi_prad"] < 1.6
   );
 }
-
-const habitablePlanets = [];
 
 function loadPlanetsData() {
   return new Promise((resolve, reject) => {
@@ -24,27 +24,48 @@ function loadPlanetsData() {
           columns: true,
         })
       )
-      .on("data", (planet) => {
-        if (isHabitablePlanet(planet)) habitablePlanets.push(planet);
+      .on("data", async (planet) => {
+        if (isHabitablePlanet(planet)) {
+          // intial write of planet to MongoDB
+          savePlanet(planet);
+        }
       })
       .on("error", (err) => {
         console.log(err);
         reject(er);
       })
-      .on("end", () => {
-        console.log(
-          "number of habitable planets found:",
-          habitablePlanets.length
-        );
+      .on("end", async () => {
+        const countPlanetsFound = (await getAllPlanets()).length;
+        console.log("number of habitable planets found:", countPlanetsFound);
         resolve();
       });
   });
 }
 
-function getAllPlanets() {
-  return habitablePlanets;
+async function getAllPlanets() {
+  return await planets.find({});
 }
 
+async function savePlanet(planet) {
+  try {
+    await planets.updateOne(
+      // first object is the filter: we're selecting a doc mathcing this object
+      {
+        keplerName: planet.kepler_name,
+      },
+      // second object is the update: we're replacing the following properties
+      {
+        keplerName: planet.kepler_name,
+      },
+      // if true and no matching doc found, create one with the update object
+      {
+        upsert: true,
+      }
+    );
+  } catch (err) {
+    console.error(err);
+  }
+}
 module.exports = {
   loadPlanetsData,
   getAllPlanets,
