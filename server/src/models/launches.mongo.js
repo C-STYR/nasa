@@ -16,7 +16,7 @@ const launchesSchema = new mongoose.Schema({
   launchDate: Date,
   target: {
     type: String,
-    required: true,
+    // required: true,
   },
   customers: [String],
   upcoming: {
